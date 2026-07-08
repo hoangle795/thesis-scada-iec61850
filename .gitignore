@@ -1,0 +1,4 @@
+libiec61850-host/
+build/
+*.o
+*.a
