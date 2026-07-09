@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <title>HMI — Trạm Biến Áp 110kV</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen p-4 md:p-8">
+  <header class="max-w-7xl mx-auto mb-8 text-center border-b border-slate-200 pb-6">
+    <h1 class="text-2xl md:text-3xl font-bold text-slate-900 flex items-center justify-center gap-2 tracking-tight">
+      <span class="text-amber-500">⚡</span> HMI SCADA — TRẠM BIẾN ÁP 110kV
+    </h1>
+  </header>
+  
+  <main class="max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="grid">
+      <div class="col-span-full text-center text-slate-500 py-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+        <p class="animate-pulse">Đang kết nối SCADA Server...</p>
+      </div>
+    </div>
+  </main>
+  
+  <footer class="max-w-7xl mx-auto mt-8 text-center text-slate-500 text-sm" id="ts"></footer>
+  
+  <script>
+    const API = "http://" + window.location.hostname + ":8080/api/data";
+    
+    async function fetchData() {
+      try {
+        const data = await (await fetch(API)).json();
+        render(data);
+      } catch {
+        document.getElementById("grid").innerHTML =
+          '<div class="col-span-full bg-red-50 border border-red-200 rounded-xl p-8 text-center text-red-600 shadow-sm"><p class="font-medium text-lg flex items-center justify-center gap-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Không kết nối được SCADA Server (172.20.0.20:8080)</p></div>';
+      }
+    }
+
+    function render(data) {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      
+      for (const [ied, d] of Object.entries(data)) {
+        const m  = d.measurements;
+        const al = d.alarms || [];
+        const lvl = al.length === 0 ? "ok" :
+                    al.some(a => a.level === "ALARM") ? "alarm" : "warning";
+        
+        const badges = { 
+          ok: `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200"><span class="mr-1.5 w-2 h-2 bg-emerald-500 rounded-full"></span>BÌNH THƯỜNG</span>`, 
+          warning: `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200"><span class="mr-1.5 w-2 h-2 bg-amber-500 rounded-full"></span>WARNING</span>`, 
+          alarm: `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200"><span class="mr-1.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>ALARM</span>`
+        };
+        
+        const mcColor = m.mc_closed ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100';
+        const dclColor = m.dcl_closed ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100';
+        const dtdColor = m.dtd_closed ? 'text-red-700 bg-red-100' : 'text-emerald-700 bg-emerald-100';
+
+        const alarmsHtml = al.length ?
+        `
+          <div class="mt-5 pt-4 border-t border-slate-100 space-y-2">
+            ${al.map(a => `
+              <div class="flex items-start text-sm ${a.level === 'ALARM' ? 'text-red-800 bg-red-50 border-red-100' : 'text-amber-800 bg-amber-50 border-amber-100'} border p-2.5 rounded-lg">
+                 <span class="font-bold mr-2 whitespace-nowrap">[${a.level}]</span> <span>${a.msg}</span>
+              </div>
+            `).join("")}
+          </div>` : "";
+          
+        grid.innerHTML += `
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+          <div class="bg-slate-50/80 px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+            <h2 class="font-semibold text-slate-800 text-lg flex items-center gap-2">
+              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+              ${ied} <span class="text-slate-300 font-normal mx-1">/</span> <span class="text-slate-600">${d.bay}</span>
+            </h2>
+            ${badges[lvl]}
+          </div>
+          
+          <div class="p-5 flex-grow">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Điện áp</span>      <span class="font-medium text-slate-900">${m.voltage_kv} <span class="text-slate-400 text-xs ml-1">kV</span></span></div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Dòng điện</span>    <span class="font-medium text-slate-900">${m.current_a} <span class="text-slate-400 text-xs ml-1">A</span></span></div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">P tác dụng</span>   <span class="font-medium text-slate-900">${m.active_power_mw} <span class="text-slate-400 text-xs ml-1">MW</span></span></div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Q phản kháng</span> <span class="font-medium text-slate-900">${m.reactive_power_mvar} <span class="text-slate-400 text-xs ml-1">MVAr</span></span></div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Tần số</span>       <span class="font-medium text-slate-900">${m.freq_hz} <span class="text-slate-400 text-xs ml-1">Hz</span></span></div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Hệ số CS</span>     <span class="font-medium text-slate-900">${m.power_factor}</span></div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Nhiệt độ dầu</span> <span class="font-medium text-slate-900">${m.temp_oil_c} <span class="text-slate-400 text-xs ml-1">°C</span></span></div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Nấc phân áp</span>  <span class="font-medium text-slate-900">${m.tap_position}</span></div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-3 gap-3 text-center text-sm">
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
+                <span class="text-slate-500 font-medium text-xs">MC</span>
+                <span class="font-bold px-2.5 py-1 rounded-md w-full ${mcColor}">${m.mc_closed ? 'ĐÓNG' : 'CẮT'}</span>
+              </div>
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
+                <span class="text-slate-500 font-medium text-xs">DCL</span>
+                <span class="font-bold px-2.5 py-1 rounded-md w-full ${dclColor}">${m.dcl_closed ? 'ĐÓNG' : 'CẮT'}</span>
+              </div>
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
+                <span class="text-slate-500 font-medium text-xs">DTĐ</span>
+                <span class="font-bold px-2.5 py-1 rounded-md w-full ${dtdColor}">${m.dtd_closed ? 'ĐÓNG' : 'MỞ'}</span>
+              </div>
+            </div>
+            
+            ${alarmsHtml}
+          </div>
+        </div>`;
+      }
+      document.getElementById("ts").innerHTML =
+        "Cập nhật lần cuối: <span class='font-medium text-slate-700'>" + new Date().toLocaleString("vi-VN") + "</span>";
+    }
+    fetchData();
+    setInterval(fetchData, 5000);
+  </script>
+</body>
+</html>
