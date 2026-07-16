@@ -1,120 +1,267 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8">
   <title>HMI — Trạm Biến Áp 110kV</title>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    body { font-family: 'Inter', sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* Nền sáng, chữ tối chuyên nghiệp */
+    body  { font-family: 'Courier New', monospace; background: #f0f2f5; color: #24292f; }
+    
+    /* ── Màn hình Đăng nhập ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; background: #e1e4e8;
+    }
+    .login-box {
+      background: #ffffff; border: 1px solid #d0d7de; border-radius: 10px;
+      padding: 40px; width: 350px; text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .login-box h2 { color: #0969da; margin-bottom: 24px; font-weight: bold; }
+    .login-box input, .login-box select {
+      width: 100%; padding: 12px; margin: 8px 0;
+      background: #f6f8fa; border: 1px solid #d0d7de;
+      border-radius: 6px; color: #24292f; font-size: 0.95rem; font-family: 'Courier New', monospace;
+    }
+    .btn-login {
+      width: 100%; padding: 12px; margin-top: 16px;
+      background: #1f883d; color: #ffffff; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold;
+    }
+    .btn-login:hover { background: #1a7f37; }
+    .err { color: #cf222e; font-size: 0.85rem; margin-top: 10px; font-weight: bold; }
+    
+    /* ── Màn hình HMI chính ── */
+    #hmi-screen { display: none; padding: 20px; max-width: 1200px; margin: auto; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 15px 20px; background: #ffffff; border: 1px solid #d0d7de;
+      border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .topbar h1 { color: #0969da; font-size: 1.3rem; font-weight: bold; }
+    .topbar span { color: #57606a; font-size: 0.9rem; font-weight: bold; margin-right: 15px;}
+    .btn-logout {
+      background: #f6f8fa; color: #cf222e; border: 1px solid #d0d7de;
+      padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-family: 'Courier New', monospace;
+    }
+    .btn-logout:hover { background: #ffebe9; border-color: #ff8182; }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px; }
+    .card {
+      background: #ffffff; border: 1px solid #d0d7de;
+      border-radius: 8px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; color: #0969da; border-bottom: 2px solid #e1e4e8; padding-bottom: 8px; }
+    .row {
+      display: flex; justify-content: space-between;
+      padding: 6px 0; font-size: 0.9rem; border-bottom: 1px dashed #e1e4e8;
+    }
+    
+    /* ── Màu sắc trạng thái ── */
+    .val { color: #1a7f37; font-weight: bold; }
+    .status-ok      { color: #1a7f37; font-weight: bold; background: #dafbe1; padding: 3px 8px; border-radius: 4px;}
+    .status-warning { color: #9a6700; font-weight: bold; background: #fff8c5; padding: 3px 8px; border-radius: 4px;}
+    .status-alarm   { color: #cf222e; font-weight: bold; background: #ffebe9; padding: 3px 8px; border-radius: 4px;}
+    
+    .alarm-box { margin-top: 12px; font-size: 0.85rem; background: #ffebe9; padding: 8px; border-radius: 6px; border: 1px solid #ff8182; }
+    .WARNING { color: #9a6700; font-weight: bold;}
+    .ALARM   { color: #cf222e; font-weight: bold;}
+    
+    /* Quy ước màu điện lực: Đóng (Có điện) = Đỏ, Cắt (Mất điện) = Xanh */
+    .sw-closed { color: #cf222e; font-weight: bold; } 
+    .sw-open   { color: #1a7f37; font-weight: bold; } 
+    
+    /* ── Control buttons ── */
+    .ctrl-box {
+      margin-top: 15px; border-top: 1px solid #d0d7de; background: #f6f8fa; padding: 12px; border-radius: 6px;
+    }
+    .ctrl-box .label { font-size: 0.85rem; color: #57606a; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;}
+    .ctrl-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-ctrl {
+      padding: 8px 12px; border-radius: 6px; border: none; font-size: 0.85rem; cursor: pointer; font-weight: bold; font-family: 'Courier New', monospace; flex: 1; min-width: 100px;
+    }
+    .btn-open  { background: #1a7f37; color: #ffffff; } 
+    .btn-close { background: #cf222e; color: #ffffff; } 
+    .btn-tap   { background: #0969da; color: #ffffff; }
+    .btn-ctrl:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-ctrl:active { transform: translateY(1px); }
+    .btn-ctrl:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .viewer-note { font-size: 0.85rem; color: #57606a; font-style: italic; margin-top: 10px; text-align: center; background: #f6f8fa; padding: 8px; border-radius: 6px;}
+    footer { text-align: center; color: #57606a; font-size: 0.85rem; margin-top: 20px; font-weight: bold; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen p-4 md:p-8">
-  <header class="max-w-7xl mx-auto mb-8 text-center border-b border-slate-200 pb-6">
-    <h1 class="text-2xl md:text-3xl font-bold text-slate-900 flex items-center justify-center gap-2 tracking-tight">
-      <span class="text-amber-500">⚡</span> HMI SCADA — TRẠM BIẾN ÁP 110kV
-    </h1>
-  </header>
-  
-  <main class="max-w-7xl mx-auto">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="grid">
-      <div class="col-span-full text-center text-slate-500 py-12 bg-white rounded-xl border border-slate-200 shadow-sm">
-        <p class="animate-pulse">Đang kết nối SCADA Server...</p>
-      </div>
+<body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <h2>⚡ HMI SCADA<br><small style="color:#57606a;font-size:0.85rem; display:block; margin-top: 5px;">Trạm Biến Áp 110kV</small></h2>
+    <input type="text"     id="username" placeholder="Tên đăng nhập" />
+    <input type="password" id="password" placeholder="Mật khẩu" />
+    <select id="role">
+      <option value="operator">Điều hành viên (Operator)</option>
+      <option value="viewer">Giám sát viên (Viewer)</option>
+    </select>
+    <button class="btn-login" onclick="doLogin()">ĐĂNG NHẬP</button>
+    <div class="err" id="login-err"></div>
+    <div style="color:#57606a;font-size:0.8rem;margin-top:15px; border-top: 1px dashed #d0d7de; padding-top: 10px;">
+      <b>Test Accounts:</b><br>
+      operator / op123<br>
+      viewer / view123
     </div>
-  </main>
-  
-  <footer class="max-w-7xl mx-auto mt-8 text-center text-slate-500 text-sm" id="ts"></footer>
-  
-  <script>
-    const API = "http://" + window.location.hostname + ":8080/api/data";
-    
-    async function fetchData() {
-      try {
-        const data = await (await fetch(API)).json();
-        render(data);
-      } catch {
-        document.getElementById("grid").innerHTML =
-          '<div class="col-span-full bg-red-50 border border-red-200 rounded-xl p-8 text-center text-red-600 shadow-sm"><p class="font-medium text-lg flex items-center justify-center gap-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Không kết nối được SCADA Server (172.20.0.20:8080)</p></div>';
-      }
-    }
+  </div>
+</div>
 
-    function render(data) {
-      const grid = document.getElementById("grid");
-      grid.innerHTML = "";
-      
-      for (const [ied, d] of Object.entries(data)) {
-        const m  = d.measurements;
-        const al = d.alarms || [];
-        const lvl = al.length === 0 ? "ok" :
-                    al.some(a => a.level === "ALARM") ? "alarm" : "warning";
-        
-        const badges = { 
-          ok: `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200"><span class="mr-1.5 w-2 h-2 bg-emerald-500 rounded-full"></span>BÌNH THƯỜNG</span>`, 
-          warning: `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200"><span class="mr-1.5 w-2 h-2 bg-amber-500 rounded-full"></span>WARNING</span>`, 
-          alarm: `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200"><span class="mr-1.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>ALARM</span>`
-        };
-        
-        const mcColor = m.mc_closed ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100';
-        const dclColor = m.dcl_closed ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100';
-        const dtdColor = m.dtd_closed ? 'text-red-700 bg-red-100' : 'text-emerald-700 bg-emerald-100';
+<div id="hmi-screen">
+  <div class="topbar">
+    <h1>⚡ TRUNG TÂM ĐIỀU KHIỂN HMI — TRẠM BIẾN ÁP 110kV</h1>
+    <div>
+      <span id="user-badge"></span>
+      <button class="btn-logout" onclick="doLogout()">Đăng xuất</button>
+    </div>
+  </div>
+  <div class="grid" id="grid">
+    <div style="text-align: center; padding: 40px; color:#0969da; font-weight: bold; font-size: 1.2rem; grid-column: 1 / -1;">
+      Đang kết nối đến SCADA Server...
+    </div>
+  </div>
+  <footer id="ts"></footer>
+</div>
 
-        const alarmsHtml = al.length ?
-        `
-          <div class="mt-5 pt-4 border-t border-slate-100 space-y-2">
-            ${al.map(a => `
-              <div class="flex items-start text-sm ${a.level === 'ALARM' ? 'text-red-800 bg-red-50 border-red-100' : 'text-amber-800 bg-amber-50 border-amber-100'} border p-2.5 rounded-lg">
-                 <span class="font-bold mr-2 whitespace-nowrap">[${a.level}]</span> <span>${a.msg}</span>
-              </div>
-            `).join("")}
-          </div>` : "";
-          
-        grid.innerHTML += `
-        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
-          <div class="bg-slate-50/80 px-5 py-4 border-b border-slate-200 flex justify-between items-center">
-            <h2 class="font-semibold text-slate-800 text-lg flex items-center gap-2">
-              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-              ${ied} <span class="text-slate-300 font-normal mx-1">/</span> <span class="text-slate-600">${d.bay}</span>
-            </h2>
-            ${badges[lvl]}
-          </div>
-          
-          <div class="p-5 flex-grow">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Điện áp</span>      <span class="font-medium text-slate-900">${m.voltage_kv} <span class="text-slate-400 text-xs ml-1">kV</span></span></div>
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Dòng điện</span>    <span class="font-medium text-slate-900">${m.current_a} <span class="text-slate-400 text-xs ml-1">A</span></span></div>
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">P tác dụng</span>   <span class="font-medium text-slate-900">${m.active_power_mw} <span class="text-slate-400 text-xs ml-1">MW</span></span></div>
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Q phản kháng</span> <span class="font-medium text-slate-900">${m.reactive_power_mvar} <span class="text-slate-400 text-xs ml-1">MVAr</span></span></div>
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Tần số</span>       <span class="font-medium text-slate-900">${m.freq_hz} <span class="text-slate-400 text-xs ml-1">Hz</span></span></div>
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Hệ số CS</span>     <span class="font-medium text-slate-900">${m.power_factor}</span></div>
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Nhiệt độ dầu</span> <span class="font-medium text-slate-900">${m.temp_oil_c} <span class="text-slate-400 text-xs ml-1">°C</span></span></div>
-              <div class="flex justify-between items-center py-1 border-b border-slate-100"><span class="text-slate-500">Nấc phân áp</span>  <span class="font-medium text-slate-900">${m.tap_position}</span></div>
-            </div>
+<script>
+// Đã cấu hình chuẩn IP 192.168.57.10
+const API     = "http://192.168.57.10:8080/api/data";
+const API_CMD = "http://192.168.57.10:8080/api/control";
 
-            <div class="mt-6 grid grid-cols-3 gap-3 text-center text-sm">
-              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
-                <span class="text-slate-500 font-medium text-xs">MC</span>
-                <span class="font-bold px-2.5 py-1 rounded-md w-full ${mcColor}">${m.mc_closed ? 'ĐÓNG' : 'CẮT'}</span>
-              </div>
-              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
-                <span class="text-slate-500 font-medium text-xs">DCL</span>
-                <span class="font-bold px-2.5 py-1 rounded-md w-full ${dclColor}">${m.dcl_closed ? 'ĐÓNG' : 'CẮT'}</span>
-              </div>
-              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-1.5">
-                <span class="text-slate-500 font-medium text-xs">DTĐ</span>
-                <span class="font-bold px-2.5 py-1 rounded-md w-full ${dtdColor}">${m.dtd_closed ? 'ĐÓNG' : 'MỞ'}</span>
-              </div>
-            </div>
-            
-            ${alarmsHtml}
-          </div>
-        </div>`;
-      }
-      document.getElementById("ts").innerHTML =
-        "Cập nhật lần cuối: <span class='font-medium text-slate-700'>" + new Date().toLocaleString("vi-VN") + "</span>";
-    }
+// ── Tài khoản (QĐ 1603/QĐ-EVN) ──
+const USERS = {
+  "operator": { pass: "op123",   role: "operator", label: "Điều hành viên" },
+  "viewer":   { pass: "view123", role: "viewer",   label: "Giám sát viên"   },
+};
+
+let currentUser = null;
+let currentRole = null;
+let refreshInterval = null;
+
+function doLogin() {
+  const u = document.getElementById("username").value.trim();
+  const p = document.getElementById("password").value;
+  const r = document.getElementById("role").value;
+  const err = document.getElementById("login-err");
+
+  if (USERS[u] && USERS[u].pass === p && USERS[u].role === r) {
+    currentUser = u;
+    currentRole = r;
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("hmi-screen").style.display  = "block";
+    document.getElementById("user-badge").textContent = `👤 ${USERS[u].label} (${u})`;
     fetchData();
-    setInterval(fetchData, 5000);
-  </script>
+    refreshInterval = setInterval(fetchData, 5000);
+  } else {
+    err.textContent = "⚠ Sai tên đăng nhập, mật khẩu hoặc vai trò!";
+  }
+}
+
+function doLogout() {
+  currentUser = null; currentRole = null;
+  if(refreshInterval) clearInterval(refreshInterval);
+  document.getElementById("hmi-screen").style.display  = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("username").value = "";
+  document.getElementById("password").value = "";
+  document.getElementById("login-err").textContent = "";
+}
+
+// ── Gửi lệnh điều khiển ──
+async function sendCmd(ied, action) {
+  if (currentRole !== "operator") return;
+  
+  const actionName = {
+    'open_mc': 'CẮT Máy cắt',
+    'close_mc': 'ĐÓNG Máy cắt',
+    'tap_up': 'TĂNG Nấc phân áp',
+    'tap_down': 'GIẢM Nấc phân áp'
+  }[action];
+
+  const ok = confirm(`⚠ XÁC NHẬN LỆNH ĐIỀU KHIỂN:\nThực hiện [${actionName}] trên thiết bị [${ied}]?`);
+  if (!ok) return;
+  
+  try {
+    const res = await fetch(API_CMD, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ ied, action, user: currentUser })
+    });
+    const data = await res.json();
+    alert("HỆ THỐNG PHẢN HỒI:\n" + data.msg);
+    fetchData(); 
+  } catch(e) {
+    alert("❌ Lỗi: Không thể gửi lệnh. Vui lòng kiểm tra kết nối mạng hoặc trạng thái SCADA Server.");
+  }
+}
+
+// ── Fetch và render ──
+async function fetchData() {
+  try {
+    const res = await fetch(API);
+    const data = await res.json();
+    render(data);
+  } catch {
+    document.getElementById("grid").innerHTML =
+      '<div style="text-align: center; padding: 40px; color:#cf222e; font-weight: bold; font-size: 1.1rem; grid-column: 1 / -1;">❌ Mất kết nối đến SCADA Server (192.168.57.10:8080). Đang thử lại...</div>';
+  }
+}
+
+function render(data) {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  const isOperator = currentRole === "operator";
+  
+  for (const [ied, d] of Object.entries(data)) {
+    const m  = d.measurements;
+    const al = d.alarms || [];
+    const lvl = al.length === 0 ? "ok" : al.some(a => a.level === "ALARM") ? "alarm" : "warning";
+    const badge = {ok:"✅ BÌNH THƯỜNG", warning:"⚠ CẢNH BÁO", alarm:"🔴 BÁO ĐỘNG"}[lvl];
+
+    const ctrlHtml = isOperator ?
+      `
+      <div class="ctrl-box">
+        <div class="label">🔧 Bảng Điều Khiển</div>
+        <div class="ctrl-row">
+          <button class="btn-ctrl btn-open"  onclick="sendCmd('${ied}','open_mc')">CẮT MC</button>
+          <button class="btn-ctrl btn-close" onclick="sendCmd('${ied}','close_mc')">ĐÓNG MC</button>
+          <button class="btn-ctrl btn-tap"   onclick="sendCmd('${ied}','tap_up')">Tăng Nấc ▲</button>
+          <button class="btn-ctrl btn-tap"   onclick="sendCmd('${ied}','tap_down')">Giảm Nấc ▼</button>
+        </div>
+      </div>` :
+      `<div class="viewer-note">👁 Tài khoản Viewer chỉ được phép giám sát.</div>`;
+      
+    grid.innerHTML += `
+    <div class="card">
+      <div class="card-title">
+        ${ied} — ${d.bay}
+        <span class="status-${lvl}" style="float:right">${badge}</span>
+      </div>
+      <div class="row"><span>Điện áp</span>      <span class="val">${m.voltage_kv} kV</span></div>
+      <div class="row"><span>Dòng điện</span>    <span class="val">${m.current_a} A</span></div>
+      <div class="row"><span>Công suất Tác dụng (P)</span>   <span class="val">${m.active_power_mw} MW</span></div>
+      <div class="row"><span>Công suất Phản kháng (Q)</span> <span class="val">${m.reactive_power_mvar} MVAr</span></div>
+      <div class="row"><span>Tần số</span>       <span class="val">${m.freq_hz} Hz</span></div>
+      <div class="row"><span>Hệ số Công suất (cosφ)</span>     <span class="val">${m.power_factor}</span></div>
+      <div class="row"><span>Nhiệt độ dầu Máy biến áp</span> <span class="val">${m.temp_oil_c} °C</span></div>
+      <div class="row"><span>Vị trí Nấc phân áp</span>  <span class="val" style="color:#0969da; font-size: 1.1em;">${m.tap_position}</span></div>
+      <div class="row" style="margin-top: 10px; background: #f6f8fa; padding: 8px; border-radius: 4px;">
+        <span>Máy Cắt: <b class="${m.mc_closed?'sw-closed':'sw-open'}">${m.mc_closed?'ĐÓNG':'CẮT'}</b></span>
+        <span>Dao Cách Ly: <b class="${m.dcl_closed?'sw-closed':'sw-open'}">${m.dcl_closed?'ĐÓNG':'CẮT'}</b></span>
+        <span>Tiếp Địa: <b class="${m.dtd_closed?'sw-closed':'sw-open'}">${m.dtd_closed?'ĐÓNG':'MỞ'}</b></span>
+      </div>
+      ${al.length?`<div class="alarm-box">${al.map(a=>`<div class="${a.level}">[${a.level}] ${a.msg}</div>`).join("")}</div>`:""}
+      ${ctrlHtml}
+    </div>`;
+  }
+  document.getElementById("ts").textContent = "Dữ liệu làm mới lần cuối: " + new Date().toLocaleString("vi-VN");
+}
+</script>
 </body>
 </html>

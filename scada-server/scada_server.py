@@ -5,6 +5,7 @@ SCADA Data Server
 - Xử lý cảnh báo 3 cấp: Warning / Alarm / Failure theo QĐ 1603/QĐ-EVN
 - Ghi vào InfluxDB (Historian)
 - Cung cấp REST API tại :8080/api/data cho HMI Web và Gateway
+- Nhận lệnh điều khiển (POST /api/control) và lưu Audit Log
 """
 import time, json, random, logging, threading
 from datetime import datetime
@@ -54,6 +55,10 @@ THR = {
 store = {}
 lock  = threading.Lock()
 
+# ── Global variables cho Control ──────────────────────────
+audit_write_api = None
+sims = {}
+
 # ── Simulator IED (dùng khi chưa có kết nối IEC 61850 thật) ──
 class IEDSim:
     def __init__(self, name):
@@ -61,6 +66,7 @@ class IEDSim:
         self.mc  = True
         self.dcl = True
         self.dtd = False
+        self.tap = 9       # Nấc phân áp khởi tạo
 
     def read(self):
         return {
@@ -72,7 +78,7 @@ class IEDSim:
             "power_factor":        round(0.92  + random.uniform(-0.02, 0.02), 3),
             "temp_oil_c":          round(65.0  + random.uniform(-3, 3), 1),
             "temp_winding_c":      round(75.0  + random.uniform(-3, 3), 1),
-            "tap_position":        random.choice([8, 9, 10]),
+            "tap_position":        self.tap,   # Dùng self.tap thay vì random
             "mc_closed":           self.mc,
             "dcl_closed":          self.dcl,
             "dtd_closed":          self.dtd,
@@ -128,6 +134,69 @@ def write_influx(write_api, ied_name, m):
     except Exception as e:
         log.warning(f"InfluxDB write error: {e}")
 
+# ── Audit log lệnh điều khiển vào InfluxDB + file ─────────
+AUDIT_LOG = "/app/audit_log.jsonl"
+def write_audit_log(user, ied, cmd, result, write_api):
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "user":      user,
+        "ied":       ied,
+        "command":   cmd,
+        "result":    result,
+    }
+    # Ghi file
+    with open(AUDIT_LOG, "a") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    # Ghi InfluxDB
+    if INFLUX_OK and write_api:
+        try:
+            p = (Point("control_audit")
+                 .tag("ied",  ied)
+                 .tag("user", user)
+                 .tag("cmd",  cmd)
+                 .field("result", result))
+            write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=p)
+        except Exception as e:
+            log.warning(f"Audit log InfluxDB error: {e}")
+
+# ── Xử lý lệnh điều khiển từ HMI ─────────────────────────
+def handle_control(cmd):
+    """
+    cmd = {
+        "ied":  "IED131",
+        "action": "open_mc" | "close_mc" | "tap_up" | "tap_down",
+        "user": "operator"
+    }
+    """
+    ied_name = cmd.get("ied")
+    action   = cmd.get("action")
+    user     = cmd.get("user", "unknown")
+
+    if ied_name not in sims:
+        return {"ok": False, "msg": f"IED {ied_name} không tồn tại"}
+
+    sim = sims[ied_name]
+    msg = ""
+
+    if action == "open_mc":
+        sim.mc = False
+        msg = f"MC {ied_name} đã CẮT"
+    elif action == "close_mc":
+        sim.mc = True
+        msg = f"MC {ied_name} đã ĐÓNG"
+    elif action == "tap_up":
+        sim.tap = min(sim.tap + 1, 17)
+        msg = f"Nấc phân áp {ied_name} tăng lên {sim.tap}"
+    elif action == "tap_down":
+        sim.tap = max(sim.tap - 1, 1)
+        msg = f"Nấc phân áp {ied_name} giảm xuống {sim.tap}"
+    else:
+        return {"ok": False, "msg": f"Lệnh không hợp lệ: {action}"}
+
+    log.info(f"[CONTROL] [{user}] {msg}")
+    write_audit_log(user, ied_name, action, msg, audit_write_api)
+    return {"ok": True, "msg": msg}
+
 # ── REST API server ────────────────────────────────────────
 class APIHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -147,6 +216,33 @@ class APIHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def do_POST(self):
+        if self.path == "/api/control":
+            length = int(self.headers.get("Content-Length", 0))
+            body   = self.rfile.read(length)
+            try:
+                cmd = json.loads(body.decode("utf-8"))
+                result = handle_control(cmd)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode())
+            except Exception as e:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.end_headers()
+
     def log_message(self, *args):
         pass
 
@@ -155,6 +251,8 @@ def run_api():
 
 # ── Main loop ─────────────────────────────────────────────
 def main():
+    global sims, audit_write_api
+    
     log.info("=== SCADA Data Server khởi động ===")
     log.info(f"Chế độ IED: {'IEC 61850 thật' if USE_IEC61850 else 'Simulation'}")
     
@@ -168,11 +266,13 @@ def main():
         except Exception as e:
             log.warning(f"InfluxDB không kết nối được: {e}")
 
+    audit_write_api = write_api
+    sims = {ied["name"]: IEDSim(ied["name"]) for ied in IED_LIST}
+
     # REST API thread
     threading.Thread(target=run_api, daemon=True).start()
     log.info("REST API tại http://172.20.0.20:8080/api/data")
     
-    sims = {ied["name"]: IEDSim(ied["name"]) for ied in IED_LIST}
     try:
         while True:
             snap = {}
