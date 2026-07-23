@@ -32,5 +32,5 @@ docker run -d --name influxdb \
 
 echo "=================================================="
 echo " 🎉 HOÀN TẤT! INFLUXDB HISTORIAN ĐANG HOẠT ĐỘNG!"
-echo " 👉 Truy cập giao diện quản lý tại: http://localhost:8086"
+echo " 👉 Truy cập giao diện quản lý tại: http://192.168.57.10:8086"
 echo "=================================================="

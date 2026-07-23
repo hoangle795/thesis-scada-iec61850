@@ -1,0 +1,13 @@
+apiVersion: 1
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://172.20.0.21:8086
+    jsonData:
+      version: Flux
+      organization: substation
+      defaultBucket: scada_data
+    secureJsonData:
+      token: scada-token-2024
+    isDefault: true

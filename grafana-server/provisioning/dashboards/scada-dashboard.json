@@ -1,0 +1,38 @@
+{
+  "title": "SCADA Trạm Biến Áp 110kV",
+  "tags": ["scada", "iec61850"],
+  "timezone": "Asia/Ho_Chi_Minh",
+  "panels": [
+    {
+      "id": 1, "title": "Điện áp các ngăn lộ (kV)", "type": "timeseries", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{"datasource": {"type": "influxdb"}, "query": "from(bucket: \"scada_data\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"ied_measurements\")\n  |> filter(fn: (r) => r._field == \"voltage_kv\")\n  |> aggregateWindow(every: 10s, fn: mean)"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 115}, {"color": "red", "value": 121}]}}}
+    },
+    {
+      "id": 2, "title": "Dòng điện các ngăn lộ (A)", "type": "timeseries", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{"datasource": {"type": "influxdb"}, "query": "from(bucket: \"scada_data\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"ied_measurements\")\n  |> filter(fn: (r) => r._field == \"current_a\")\n  |> aggregateWindow(every: 10s, fn: mean)"}]
+    },
+    {
+      "id": 3, "title": "Tần số hệ thống (Hz)", "type": "timeseries", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{"datasource": {"type": "influxdb"}, "query": "from(bucket: \"scada_data\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"ied_measurements\")\n  |> filter(fn: (r) => r._field == \"freq_hz\")\n  |> aggregateWindow(every: 10s, fn: mean)"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 49.5}, {"color": "red", "value": 50.5}]}}}
+    },
+    {
+      "id": 4, "title": "Nhiệt độ dầu MBA (°C)", "type": "timeseries", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{"datasource": {"type": "influxdb"}, "query": "from(bucket: \"scada_data\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"ied_measurements\")\n  |> filter(fn: (r) => r._field == \"temp_oil_c\")\n  |> aggregateWindow(every: 10s, fn: mean)"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 75}, {"color": "red", "value": 85}]}}}
+    },
+    {
+      "id": 5, "title": "Công suất tác dụng (MW)", "type": "timeseries", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{"datasource": {"type": "influxdb"}, "query": "from(bucket: \"scada_data\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"ied_measurements\")\n  |> filter(fn: (r) => r._field == \"active_power_mw\")\n  |> aggregateWindow(every: 10s, fn: mean)"}]
+    },
+    {
+      "id": 6, "title": "Trạng thái MC (1=ĐÓNG, 0=CẮT)", "type": "timeseries", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{"datasource": {"type": "influxdb"}, "query": "from(bucket: \"scada_data\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"ied_measurements\")\n  |> filter(fn: (r) => r._field == \"mc_closed\")\n  |> aggregateWindow(every: 10s, fn: last)"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}}}
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "version": 1
+}

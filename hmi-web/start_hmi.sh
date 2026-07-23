@@ -25,7 +25,7 @@ docker run -d --name hmi-web \
 
 echo "=================================================="
 echo " 🎉 HOÀN TẤT! WEB HMI ĐÃ SẴN SÀNG HOẠT ĐỘNG!"
-echo " 👉 Truy cập giao diện từ Windows: http://192.168.56.10:9090"
+echo " 👉 Truy cập giao diện từ Windows: http://192.168.57.10:9090"
 echo "=================================================="
 # Hiển thị trạng thái container vừa bật
 docker ps | grep hmi-web
