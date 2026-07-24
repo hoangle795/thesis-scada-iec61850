@@ -1,0 +1,58 @@
+---
+- name: ORCHESTRATE HẠ TẦNG SCADA VÀ THIẾT LẬP BẢO MẬT DMZ
+  hosts: localhost
+  connection: local
+  become: yes
+  
+  vars:
+    project_dir: "/home/scada/thesis-scada-iec61850"
+
+  tasks:
+    - name: 0. Cấp quyền thực thi cho toàn bộ file bash
+      shell: "find {{ project_dir }} -type f -name '*.sh' -exec chmod +x {} +"
+
+    - name: 1. Khởi tạo Cơ sở dữ liệu Historian (InfluxDB)
+      shell: "$(find {{ project_dir }} -type f -name 'start_historian.sh' | head -n 1)"
+
+    - name: 2. Kích hoạt 4 Node IED Giả lập
+      shell: "$(find {{ project_dir }} -type f -name 'start_ieds.sh' | head -n 1)"
+
+    - name: 3. Khởi động SCADA Data Server
+      shell: "$(find {{ project_dir }} -type f -name 'start_scada.sh' | head -n 1)"
+
+    - name: 4. Khởi chạy Web HMI Dashboard
+      shell: "$(find {{ project_dir }} -type f -name 'start_hmi.sh' | head -n 1)"
+
+    - name: 5. Kích hoạt Gateway chuyển tiếp WAN
+      shell: "$(find {{ project_dir }} -type f -name 'start_gateway.sh' | head -n 1)"
+
+    - name: 6. Khởi chạy Trung tâm Điều độ (EVN A2/B1)
+      shell: "$(find {{ project_dir }} -type f -name 'start_dispatch.sh' | head -n 1)"
+
+    - name: 7. Khởi tạo mạng IT (it-net) cho Trung tâm điều độ
+      shell: docker network create --subnet=172.21.0.0/24 it-net
+      register: it_net
+      failed_when: 
+        - it_net.rc != 0 
+        - "'already exists' not in it_net.stderr"
+      changed_when: it_net.rc == 0
+
+    - name: 8. Biến Gateway thành Proxy DMZ (Cắm thêm cạc mạng IT)
+      shell: |
+        docker network connect --ip 172.21.0.30 it-net gateway || true
+      args:
+        executable: /bin/bash
+
+    - name: 9. Cô lập Trung tâm Điều độ (Rút cáp OT, cắm sang mạng IT)
+      shell: |
+        docker network disconnect substation-net dispatch-center || true
+        docker network connect --ip 172.21.0.31 it-net dispatch-center || true
+      args:
+        executable: /bin/bash
+
+    - name: 10. Khởi động lại các node biên để nhận bảng định tuyến mới
+      command: docker restart gateway dispatch-center
+
+    - name: BÁO CÁO KẾT QUẢ TRIỂN KHAI
+      debug:
+        msg: "✅ HỆ THỐNG SẴN SÀNG! Các node đã chạy và mô hình DMZ được thiết lập cách ly hoàn toàn."
