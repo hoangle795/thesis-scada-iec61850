@@ -1,2 +1,4 @@
 *.yml linguist-language=YAML
 *.yml linguist-detectable=true
+*.tf linguist-language=HCL
+*.tf linguist-detectable=true
